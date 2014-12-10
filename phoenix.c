@@ -31,14 +31,12 @@
 #include <unistd.h>
 #include <lthread.h>
 
-
 #define  PH_DEFAULT_PORT     8080
 #define  PH_DEFAULT_BACKLOG  1024
 #define  PH_DEFAULT_TIMEOUT  3000
 #define  PH_DEFAULT_BUFSIZE  256
 #define  PH_DEFAULT_INCSIZE  128
 #define  PH_MAX_HEADER_SIZE  2048
-
 
 typedef enum {
     ph_header_s0,
@@ -112,7 +110,7 @@ void ph_service_handler(void *arg)
 
     conn->buf = malloc(PH_DEFAULT_BUFSIZE);
     if (!conn->buf) {
-        close(conn->fd);
+        close(conn->fd); /* not in epoll */
         free(conn);
         return;
     }
@@ -146,7 +144,7 @@ void ph_service_handler(void *arg)
         }
 
         bytes = lthread_recv(conn->fd, conn->last,
-            conn->end - conn->last, 0, PH_DEFAULT_TIMEOUT);
+                             conn->end - conn->last, 0, PH_DEFAULT_TIMEOUT);
         if (bytes == -2) { /* timeout */
             goto out;
         }
@@ -163,7 +161,7 @@ void ph_service_handler(void *arg)
     lthread_send(conn->fd, http200, sizeof(http200) - 1, 0);
 
 out:
-    close(conn->fd);
+    lthread_close(conn->fd);
     free(conn->buf);
     free(conn);
     return;
