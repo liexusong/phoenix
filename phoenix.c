@@ -48,17 +48,20 @@ typedef enum {
 typedef struct {
     int fd;
     struct sockaddr_in addr;
+    ph_header_state state;
     char *buf;
     char *pos;
     char *last;
     char *end;
-    ph_header_state state;
 } ph_connection_t;
 
 
-static char http200[] = "HTTP/1.0 200 OK\r\nContent-length: 15\r\n\r\nHello Liexusong";
+static char http200[] =             \
+    "HTTP/1.0 200 OK\r\n"           \
+    "Content-length: 28\r\n\r\n"    \
+    "<h1>Phoenix HTTP Server</h1>";
 
-int ph_read_header(ph_connection_t *conn)
+int ph_header_finish(ph_connection_t *conn)
 {
     while (conn->pos < conn->end) {
 
@@ -90,7 +93,8 @@ int ph_read_header(ph_connection_t *conn)
         case ph_header_s3:
             if (*conn->pos == '\n') {
                 conn->pos++; /* move the end of header */
-                return 0;
+                return 1;
+
             } else {
                 conn->state = ph_header_s0;
             }
@@ -100,9 +104,13 @@ int ph_read_header(ph_connection_t *conn)
         conn->pos++;
     }
 
-    return -1;
+    return 0;
 }
 
+
+/*
+ * process client connection
+ */
 void ph_service_handler(void *arg)
 {
     ph_connection_t *conn = arg;
@@ -121,18 +129,19 @@ void ph_service_handler(void *arg)
 
     for ( ;; ) {
 
-        if (conn->end - conn->last <= 0) { /* resize read buffer */
+        if (conn->last >= conn->end) { /* resize read buffer */
             if (conn->end - conn->buf >= PH_MAX_HEADER_SIZE) {
                 goto out;
             }
 
-            int   size = (conn->end - conn->buf) + PH_DEFAULT_INCSIZE;
+            int size = (conn->end - conn->buf) + PH_DEFAULT_INCSIZE;
             char *temp = realloc(conn->buf, size);
 
-            if (temp) {
+            if (temp != NULL) {
                 int pos = conn->pos - conn->buf;
                 int last = conn->last - conn->buf;
 
+                /* reset buffer status */
                 conn->buf = temp;
                 conn->pos = conn->buf + pos;
                 conn->last = conn->buf + last;
@@ -151,12 +160,10 @@ void ph_service_handler(void *arg)
 
         conn->last += bytes;
 
-        if (!ph_read_header(conn)) { /* read header finish */
+        if (ph_header_finish(conn)) { /* read header finish */
             break;
         }
     }
-
-    fprintf(stderr, "Header length: %d, %s\n", conn->pos - conn->buf, conn->buf);
 
     lthread_send(conn->fd, http200, sizeof(http200) - 1, 0);
 
@@ -227,8 +234,8 @@ void ph_listen_handler(void *arg)
             continue;
         }
 
-        conn->addr = addr;
         conn->fd = cfd;
+        conn->addr = addr;
         conn->state = ph_header_s0;
 
         (void)lthread_create(&clt, (void *)ph_service_handler, (void *)conn);
