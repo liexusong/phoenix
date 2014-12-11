@@ -1,2 +1,2 @@
 all:
-	gcc phoenix.c -o phoenix -llthread -lpthread
+	gcc phoenix.c http_parser.c -o phoenix -llthread -lpthread

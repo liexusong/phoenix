@@ -30,6 +30,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <lthread.h>
+#include "http_parser.h"
 
 #define  PH_DEFAULT_PORT     8080
 #define  PH_DEFAULT_BACKLOG  1024
@@ -108,6 +109,55 @@ int ph_header_finish(ph_connection_t *conn)
 }
 
 
+int ph_parse_begin(http_parser *parser)
+{
+	fprintf(stderr, "Parse header begin\n");
+    return 0;
+}
+
+
+int ph_parse_complete(http_parser *parser)
+{
+    fprintf(stderr, "Parse header complete\n");
+    return 0;
+}
+
+
+int ph_parse_url(http_parser* parser, const char *at, size_t length)
+{
+    printf("Url: %.*s\n", (int)length, at);
+    return 0;
+}
+
+
+int ph_parse_header_field(http_parser* parser, const char *at, size_t length)
+{
+    printf("Header field: %.*s\n", (int)length, at);
+    return 0;
+}
+
+
+int ph_parse_header_value(http_parser* parser, const char *at, size_t length)
+{
+    printf("Header value: %.*s\n", (int)length, at);
+    return 0;
+}
+
+
+int ph_parse_headers_complete(http_parser* parser)
+{
+    printf("Headers complete\n");
+    return 0;
+}
+
+
+int ph_parse_body(http_parser* parser, const char *at, size_t length)
+{
+    printf("Body: %.*s\n", (int)length, at);
+    return 0;
+}
+
+
 /*
  * process client connection
  */
@@ -115,6 +165,9 @@ void ph_service_handler(void *arg)
 {
     ph_connection_t *conn = arg;
     int bytes;
+    http_parser_settings sc;
+    http_parser parser;
+    int header_len;
 
     conn->buf = malloc(PH_DEFAULT_BUFSIZE);
     if (!conn->buf) {
@@ -164,6 +217,20 @@ void ph_service_handler(void *arg)
             break;
         }
     }
+
+    /* parse header */
+    sc.on_message_begin = ph_parse_begin;
+    sc.on_url = ph_parse_url;
+    sc.on_header_field = ph_parse_header_field;
+    sc.on_header_value = ph_parse_header_value;
+    sc.on_headers_complete = ph_parse_headers_complete;
+    sc.on_body = ph_parse_body;
+    sc.on_message_complete = ph_parse_complete;
+
+    http_parser_init(&parser, HTTP_REQUEST);
+    header_len = http_parser_execute(&parser, &sc, conn->buf, conn->pos - conn->buf);
+
+    /* send response to client connection */
 
     lthread_send(conn->fd, http200, sizeof(http200) - 1, 0);
 
