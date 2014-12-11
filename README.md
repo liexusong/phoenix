@@ -1,3 +1,3 @@
 phoenix
 =======
-phoenix is a fast and light HTTP server using lthread library
+phoenix is a HTTP server for PHP extension
