@@ -1,12 +1,11 @@
 
 /*
- * memory pool
+ * memory pool design from Nginx
  */
 
 #include <stdlib.h>
 #include <string.h>
 #include "pool.h"
-
 
 ph_pool_t *ph_create_pool(size_t size)
 {
