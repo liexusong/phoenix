@@ -48,7 +48,7 @@ void ph_destroy_pool(ph_pool_t *pool)
 
 void *ph_palloc(ph_pool_t *pool, size_t size)
 {
-    char              *m;
+    char             *m;
     ph_pool_t        *p, *n;
     ph_pool_large_t  *large, *last;
 
