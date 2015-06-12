@@ -5,19 +5,23 @@
 #include "pool.h"
 #include "http_parser.h"
 
-#define PH_DEFAULT_HEADER_SIZE  128
+#define PH_DEFAULT_HEADER_SIZE  256
 #define PH_MAX_HEADER_SIZE      2048
 
+typedef struct {
+    int sock;
+    HashTable callbacks;
+} phx_base_t;
 
-typedef struct ph_connection_s {
-    int fd;
-    ph_pool_t *pool;
+typedef struct {
+    int sock;
+    phx_pool_t *pool;
     struct event event;
     struct http_parser parser;
     char *buf;
     char *last;
     char *end;
-} ph_connection_t;
+} phx_connection_t;
 
 #endif
 

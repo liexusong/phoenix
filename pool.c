@@ -1,21 +1,20 @@
-
 /*
- * memory pool design from Nginx
+ * memory pool copy from Nginx
  */
 
 #include <stdlib.h>
 #include <string.h>
 #include "pool.h"
 
-ph_pool_t *ph_create_pool(size_t size)
+phx_pool_t *phx_create_pool(size_t size)
 {
-    ph_pool_t  *p;
+    phx_pool_t  *p;
 
     if (!(p = malloc(size))) {
        return NULL;
     }
 
-    p->last = (char *) p + sizeof(ph_pool_t);
+    p->last = (char *) p + sizeof(phx_pool_t);
     p->end = (char *) p + size;
     p->next = NULL;
     p->large = NULL;
@@ -24,10 +23,10 @@ ph_pool_t *ph_create_pool(size_t size)
 }
 
 
-void ph_destroy_pool(ph_pool_t *pool)
+void phx_destroy_pool(phx_pool_t *pool)
 {
-    ph_pool_t        *p, *n;
-    ph_pool_large_t  *l;
+    phx_pool_t        *p, *n;
+    phx_pool_large_t  *l;
 
     for (l = pool->large; l; l = l->next) {
         if (l->alloc) {
@@ -45,17 +44,17 @@ void ph_destroy_pool(ph_pool_t *pool)
 }
 
 
-void *ph_palloc(ph_pool_t *pool, size_t size)
+void *phx_palloc(phx_pool_t *pool, size_t size)
 {
     char             *m;
-    ph_pool_t        *p, *n;
-    ph_pool_large_t  *large, *last;
+    phx_pool_t        *p, *n;
+    phx_pool_large_t  *large, *last;
 
-    if (size <= (size_t) PH_MAX_ALLOC_FROM_POOL
-        && size <= (size_t) (pool->end - (char *) pool) - sizeof(ph_pool_t))
+    if (size <= (size_t) PHX_MAX_ALLOC_FROM_POOL
+        && size <= (size_t) (pool->end - (char *) pool) - sizeof(phx_pool_t))
     {
         for (p = pool, n = pool->next; /* void */; p = n, n = n->next) {
-            m = ph_align(p->last);
+            m = phx_align(p->last);
 
             if ((size_t) (p->end - m) >= size) {
                 p->last = m + size ;
@@ -70,7 +69,7 @@ void *ph_palloc(ph_pool_t *pool, size_t size)
 
         /* allocate a new pool block */
 
-        if (!(n = ph_create_pool((size_t) (p->end - (char *) p)))) {
+        if (!(n = phx_create_pool((size_t) (p->end - (char *) p)))) {
             return NULL;
         }
 
@@ -101,7 +100,7 @@ void *ph_palloc(ph_pool_t *pool, size_t size)
     }
 
     if (large == NULL) {
-        if (!(large = ph_palloc(pool, sizeof(ph_pool_large_t)))) {
+        if (!(large = phx_palloc(pool, sizeof(phx_pool_large_t)))) {
             return NULL;
         }
 
@@ -125,9 +124,9 @@ void *ph_palloc(ph_pool_t *pool, size_t size)
 }
 
 
-void ph_pfree(ph_pool_t *pool, void *p)
+void phx_pfree(phx_pool_t *pool, void *p)
 {
-    ph_pool_large_t  *l;
+    phx_pool_large_t  *l;
 
     for (l = pool->large; l; l = l->next) {
         if (p == l->alloc) {
@@ -138,11 +137,11 @@ void ph_pfree(ph_pool_t *pool, void *p)
 }
 
 
-void *ph_pcalloc(ph_pool_t *pool, size_t size)
+void *phx_pcalloc(phx_pool_t *pool, size_t size)
 {
     void *p;
 
-    p = ph_palloc(pool, size);
+    p = phx_palloc(pool, size);
     if (p) {
         memset(p, 0, size);
     }

@@ -1,34 +1,34 @@
-#ifndef PH_POOL_H
-#define PH_POOL_H
+#ifndef PHX_POOL_H
+#define PHX_POOL_H
 
-typedef struct ph_pool_s  ph_pool_t;
-typedef struct ph_pool_large_s  ph_pool_large_t;
+typedef struct phx_pool_s  phx_pool_t;
+typedef struct phx_pool_large_s  phx_pool_large_t;
 
-struct ph_pool_large_s {
-    ph_pool_large_t   *next;
+struct phx_pool_large_s {
+    phx_pool_large_t   *next;
     void              *alloc;
 };
 
-struct ph_pool_s {
+struct phx_pool_s {
     char              *last;
     char              *end;
-    ph_pool_t         *next;
-    ph_pool_large_t   *large;
+    phx_pool_t         *next;
+    phx_pool_large_t   *large;
 };
 
-#define PH_MAX_ALLOC_FROM_POOL  4095
-#define PH_DEFAULT_POOL_SIZE   (16 * 1024)
+#define PHX_MAX_ALLOC_FROM_POOL  4095
+#define PHX_DEFAULT_POOL_SIZE   (16 * 1024)
 
-#define PH_ALIGN       (sizeof(unsigned long) - 1)
-#define PH_ALIGN_CAST  (unsigned long)
+#define PHX_ALIGN       (sizeof(unsigned long) - 1)
+#define PHX_ALIGN_CAST  (unsigned long)
 
-#define ph_align(p)    (char *)((PH_ALIGN_CAST p + PH_ALIGN) & ~PH_ALIGN)
+#define phx_align(p)    (char *)((PHX_ALIGN_CAST p + PHX_ALIGN) & (~PHX_ALIGN))
 
 
-ph_pool_t *ph_create_pool(size_t size);
-void ph_destroy_pool(ph_pool_t *pool);
-void *ph_palloc(ph_pool_t *pool, size_t size);
-void ph_pfree(ph_pool_t *pool, void *p);
-void *ph_pcalloc(ph_pool_t *pool, size_t size);
+phx_pool_t *phx_create_pool(size_t size);
+void phx_destroy_pool(phx_pool_t *pool);
+void *phx_palloc(phx_pool_t *pool, size_t size);
+void phx_pfree(phx_pool_t *pool, void *p);
+void *phx_pcalloc(phx_pool_t *pool, size_t size);
 
 #endif

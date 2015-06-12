@@ -1,5 +1,6 @@
 #include "phoenix.h"
 
+
 struct http_parser_settings setting = {
     .on_message_begin = ,
     .on_url = ,
@@ -11,39 +12,40 @@ struct http_parser_settings setting = {
     .on_message_complete = ,
 };
 
-void ph_listen_handler(int fd, short event, void *arg)
+
+void phx_listen(int fd, short event, void *arg)
 {
     int sfd;
     struct sockaddr_in addr;
     int size = sizeof(struct sockaddr_in);
-    ph_pool_t *pool;
-    ph_connection_t *conn;
+    phx_pool_t *pool;
+    phx_connection_t *conn;
+    char *buf;
 
     for ( ;; ) {
+
         sfd = accept(fd, (struct sockaddr*)&addr, &size);
         if (sfd == -1) {
+            phx_log_error("Failed to accpet client from listen socket");
             break;
         }
 
-        pool = ph_create_pool(PH_DEFAULT_POOL_SIZE);
-        if (!pool) {
+        if (!(pool = phx_create_pool(PHX_DEFAULT_POOL_SIZE)) ||
+            !(conn = phx_palloc(sizeof(*conn))) ||
+            !(buf = phx_palloc(PHX_DEFAULT_POOL_SIZE)))
+        {
             goto failed;
         }
 
-        conn = ph_palloc(sizeof(ph_connection_t));
-        if (!conn) {
-            goto failed;
-        }
-
-        conn->fd = sfd;
+        conn->sock = sfd;
         conn->pool = pool;
         conn->parser.data = conn;
-        conn->buf = ph_palloc(conn->pool, PH_DEFAULT_HEADER_SIZE);
+        conn->buf = buf;
         conn->last = conn->buf;
-        conn->end = conn->buf + PH_DEFAULT_HEADER_SIZE;
+        conn->end = conn->buf + PHX_DEFAULT_POOL_SIZE;
 
-        event_set(&conn->event, conn->fd,
-            EV_READ|EV_PERSIST, ph_request_handler, conn);
+        event_set(&conn->event, conn->sock,
+            EV_READ|EV_PERSIST, phx_process_request, conn);
         event_base_set(base, &conn->event);
         event_add(&conn->event, NULL);
 
@@ -51,7 +53,7 @@ void ph_listen_handler(int fd, short event, void *arg)
 
 failed:
         if (pool)
-            ph_destroy_pool(pool);
+            phx_destroy_pool(pool);
         close(sfd);
         break;
     }
@@ -59,43 +61,53 @@ failed:
     return 0;
 }
 
-void ph_request_handler(int fd, short event, void *arg)
+
+void phx_process_request(int fd, short event, void *arg)
 {
-    ph_connection_t *conn = arg;
+    phx_connection_t *conn = arg;
     int bytes, nread;
-    char *nb;
+    char *nbuf;
     int last;
 
+    if (conn->sock != fd) {
+        phx_log_error("Libevent fd -> (%d) not equls conn::sock -> (%d)", fd, conn->sock);
+        return;
+    }
+
     for ( ;; ) {
+
         bytes = conn->end - conn->last;
 
-        if (bytes <= 0) {
-            if (conn->end - conn->buf >= PH_MAX_HEADER_SIZE) {
-                ph_close_connection(conn);
+        if (bytes <= 0) { /* resize request buffer */
+
+            /* client header buffer size exceeding the max size */
+            if (conn->end - conn->buf >= PHX_MAX_HEADER_SIZE) {
+                phx_close_connection(conn);
                 break;
             }
 
-            nb = ph_palloc(conn->pool, PH_MAX_HEADER_SIZE);
-            if (!nb) {
-                ph_close_connection(conn);
+            /* alloc the max buffer size */
+            nbuf = phx_palloc(conn->pool, PHX_MAX_HEADER_SIZE);
+            if (!nbuf) {
+                phx_close_connection(conn);
                 break;
             }
 
             last = conn->last - conn->buf;
 
-            memcpy(nb, conn->buf, last);
-            ph_pfree(conn->buf);
+            memcpy(nbuf, conn->buf, last);
+            phx_pfree(conn->buf);
 
-            conn->buf = nb;
+            conn->buf = nbuf;
             conn->last = conn->buf + last;
-            conn->end = conn->buf + PH_MAX_HEADER_SIZE;
+            conn->end = conn->buf + PHX_MAX_HEADER_SIZE;
 
             bytes = conn->end - conn->last;
         }
 
-        nread = read(conn->fd, conn->last, bytes);
+        nread = read(conn->sock, conn->last, bytes);
         if (nread == 0) { /* connection was closed */
-            ph_close_connection(conn);
+            phx_close_connection(conn);
             break;
         } else if (nread < 0) {
             break;
@@ -105,9 +117,21 @@ void ph_request_handler(int fd, short event, void *arg)
 
         bytes = http_parser_execute(&conn->parser, &setting,
             conn->buf, conn->last - conn->buf);
-        if (bytes > 0) { /* parse finished */
+        if (bytes > 0) { /* parse OK */
             
         }
     }
 }
 
+
+void phx_send_response(int fd, short event, void *arg)
+{
+    
+}
+
+
+void phx_close_connection(phx_connection_t *conn)
+{
+    close(conn->sock);
+    phx_free_pool(conn->pool);
+}
